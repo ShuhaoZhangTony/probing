@@ -15,6 +15,10 @@ from probing.ext.engines.registry import (
     update_scrape_result,
 )
 from probing.ext.engines.sglang import fetch_sglang_metrics, flatten_samples_for_storage
+from probing.ext.engines.vllm_hust import (
+    VllmHustMetricsSnapshot,
+    fetch_vllm_hust_metrics,
+)
 
 
 @table("inference_engine_metric")
@@ -29,7 +33,9 @@ class InferenceEngineMetric:
 
 
 _scraper_lock = threading.Lock()
+_window_lock = threading.Lock()
 _scraper_started = False
+_vllm_hust_windows: dict[str, tuple[int, VllmHustMetricsSnapshot]] = {}
 
 
 def scrape_interval_seconds() -> float:
@@ -41,19 +47,39 @@ def scrape_interval_seconds() -> float:
 
 
 def scrape_engine(registration: EngineRegistration) -> dict:
-    if registration.engine_type != "sglang":
+    if registration.engine_type == "sglang":
+        snapshot = fetch_sglang_metrics(
+            registration.engine_id,
+            registration.router_addr,
+            metrics_path=registration.metrics_path,
+        )
+    elif registration.engine_type == "vllm-hust":
+        with _window_lock:
+            prior = _vllm_hust_windows.get(registration.engine_id)
+        previous = (
+            prior[1]
+            if prior is not None and prior[0] == registration.registered_at_ns
+            else None
+        )
+        snapshot = fetch_vllm_hust_metrics(
+            registration.engine_id,
+            registration.router_addr,
+            metrics_path=registration.metrics_path,
+            previous=previous,
+        )
+        if snapshot.scrape_error is None and snapshot.raw_samples:
+            with _window_lock:
+                _vllm_hust_windows[registration.engine_id] = (
+                    registration.registered_at_ns,
+                    snapshot,
+                )
+    else:
         update_scrape_result(
             registration.engine_id,
             normalized={},
             scrape_error=f"unsupported engine_type={registration.engine_type}",
         )
         return {"engine_id": registration.engine_id, "error": "unsupported engine_type"}
-
-    snapshot = fetch_sglang_metrics(
-        registration.engine_id,
-        registration.router_addr,
-        metrics_path=registration.metrics_path,
-    )
     update_scrape_result(
         registration.engine_id,
         normalized=snapshot.normalized,

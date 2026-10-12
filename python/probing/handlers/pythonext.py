@@ -666,17 +666,38 @@ def register_inference_engine(
     engine_type: str = "sglang",
     framework: str = "agentic-rl",
     metrics_path: str = "/metrics",
+    model_id: Optional[str] = None,
+    runtime_revision: Optional[str] = None,
+    accelerator_backend: str = "vllm-ascend-hust",
 ) -> str:
     """Register an inference engine metrics endpoint."""
-    from probing.ext.engines import register_engine, scrape_engine
+    from probing.ext.engines import register_engine, register_vllm_hust, scrape_engine
 
-    registration = register_engine(
-        router_addr=router_addr,
-        engine_id=engine_id,
-        engine_type=engine_type,
-        framework=framework,
-        metrics_path=metrics_path,
-    )
+    if engine_type == "vllm-hust":
+        if not model_id or not runtime_revision:
+            return json.dumps(
+                {
+                    "error": (
+                        "vllm-hust registration requires model_id and runtime_revision"
+                    )
+                }
+            )
+        registration = register_vllm_hust(
+            router_addr,
+            engine_id=engine_id,
+            model_id=model_id,
+            runtime_revision=runtime_revision,
+            accelerator_backend=accelerator_backend,
+            framework=framework,
+        )
+    else:
+        registration = register_engine(
+            router_addr=router_addr,
+            engine_id=engine_id,
+            engine_type=engine_type,
+            framework=framework,
+            metrics_path=metrics_path,
+        )
     snapshot = scrape_engine(registration)
     return json.dumps(
         {

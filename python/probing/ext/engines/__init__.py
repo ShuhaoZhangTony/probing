@@ -1,11 +1,11 @@
 """Inference engine metrics for Probing-RL.
 
-Generic registration is framework-neutral. Concrete adapters (e.g. SGLang,
-Slime ``sglang_router``) live under ``probing.ext.engines.sglang`` and
-``register_slime_sglang_router``. Metrics paths differ by adapter::
+Generic registration is framework-neutral. Concrete adapters (SGLang, Slime
+``sglang_router``, and vllm-hust) own runtime-specific normalization. Metrics
+paths differ by adapter::
 
     /engine_metrics  — Slime sglang_router / model gateway
-    /metrics         — sglang.launch_server --enable-metrics
+    /metrics         — sglang.launch_server or vllm-hust
 """
 
 from probing.ext.engines.registry import (
@@ -13,6 +13,7 @@ from probing.ext.engines.registry import (
     list_engines,
     register_engine,
     register_slime_sglang_router,
+    register_vllm_hust,
     unregister_engine,
 )
 from probing.ext.engines.scraper import (
@@ -27,6 +28,7 @@ __all__ = [
     "list_engines",
     "register_engine",
     "register_slime_sglang_router",
+    "register_vllm_hust",
     "scrape_all",
     "scrape_engine",
     "unregister_engine",

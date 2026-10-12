@@ -1,6 +1,6 @@
-# 推理引擎指标展示（SGLang）
+# 推理引擎指标展示（SGLang 与 vllm-hust）
 
-Probing 定期从推理引擎抓取 Prometheus 指标，归一化后在 Web UI 的 **`/inference`** 页面展示。当前已实现 **SGLang** 适配，不依赖 Slime。
+Probing 定期从推理引擎抓取 Prometheus 指标，归一化后在 Web UI 的 **`/inference`** 页面展示。当前支持 **SGLang** 和 GenNova 使用的 **vllm-hust**；两者均不要求 Slime。
 
 ## 功能概述
 
@@ -12,13 +12,14 @@ Probing 后台每隔约 5 秒从已注册的推理引擎 **指标端点** 抓取
 |----------|----------|
 | Slime `sglang_router` / model gateway | `/engine_metrics` |
 | `sglang.launch_server --enable-metrics` | `/metrics` |
+| `vllm-hust` | `/metrics` |
 
 注册引擎时通过 `metrics_path` 指定，或设置环境变量 `PROBING_ENGINE_METRICS_PATH`。
 
 ## 数据流
 
 ```
-SGLang 指标端点（/metrics 或 /engine_metrics）
+推理引擎指标端点（/metrics 或 /engine_metrics）
   → Probing 后台定期抓取（默认每 5 秒）
   → 归一化为 7 个 canonical 指标
   → 写入 python.inference_engine_metric，并更新引擎 registry 中的最新值
@@ -53,9 +54,48 @@ SGLang 指标端点（/metrics 或 /engine_metrics）
 
 若某时刻引擎未暴露对应原始指标，或尚无推理负载，卡片可能显示 `—`，折线图可能暂无采样点。
 
+### vllm-hust 的窗口语义
+
+`vllm-hust` 的并发数、队列深度和 KV cache 占用是即时 gauge；吞吐、
+TTFT、TPOT 和 prefix-cache 命中率来自计数器或直方图，必须由连续两次
+抓取的差分计算：
+
+| 归一化指标 | vllm-hust 原始指标/计算 |
+|------------|-------------------------|
+| `inflight_requests` | 所有实例的 `vllm:num_requests_running` 之和 |
+| `queue_depth` | 所有实例的 `vllm:num_requests_waiting` 之和 |
+| `kv_cache_usage_ratio` | `vllm:kv_cache_usage_perc` 的实例最大值 |
+| `throughput_tps` | `delta(vllm:generation_tokens_total) / delta(time)` |
+| `ttft_ms` | `delta(vllm:time_to_first_token_seconds_sum) / delta(..._count) * 1000` |
+| `tpot_ms` | `delta(vllm:request_time_per_output_token_seconds_sum) / delta(..._count) * 1000` |
+| `cache_hit_ratio` | `delta(vllm:prefix_cache_hits_total) / delta(vllm:prefix_cache_queries_total)` |
+
+首次抓取只发布三个 gauge。若计数器重启、标签集合变化或窗口内没有可计算
+的分母，相应派生指标在该窗口缺失，而不是伪造为 0。原始样本仍写入
+`python.inference_engine_metric`，便于排查。
+
 ## 如何使用
 
 以下说明如何在 Probing 中接入并展示 **真实 SGLang 推理服务**（`sglang.launch_server`）。
+
+### vllm-hust / GenNova 注册
+
+先确认 vllm-hust 的 Prometheus 端点可访问，再向 Probing 注册。模型和运行时
+修订是必填 provenance，避免 GenNova 消费来自错误模型或二进制的快照：
+
+```bash
+curl -G 'http://127.0.0.1:8080/apis/pythonext/engines/register' \
+  --data-urlencode 'router_addr=http://127.0.0.1:8000' \
+  --data-urlencode 'engine_id=qwen35-prod' \
+  --data-urlencode 'engine_type=vllm-hust' \
+  --data-urlencode 'model_id=Qwen/Qwen3.5-35B-A3B' \
+  --data-urlencode 'runtime_revision=d0f22d2bda562156e4dbf433ce645e1769b4f804' \
+  --data-urlencode 'accelerator_backend=vllm-ascend-hust'
+```
+
+也可在同一 Python 进程中调用 `register_vllm_hust(...)`。注册入口固定抓取
+`/metrics`，并保留 `model_id`、`runtime_revision`、
+`accelerator_backend` 和 `integration=gennova` 标签。
 
 ### 前置：构建 Web UI
 
@@ -142,7 +182,7 @@ done
 |------|------|
 | `GET /apis/pythonext/engines/snapshot` | 查看已注册引擎及最新归一化指标 |
 | `GET /apis/pythonext/engines/scrape` | 立即触发一次指标抓取 |
-| `GET /apis/pythonext/engines/register?router_addr=...&engine_type=sglang&metrics_path=/metrics` | 手动注册引擎 |
+| `GET /apis/pythonext/engines/register?...` | 手动注册 SGLang 或 vllm-hust；后者要求 `model_id` 与 `runtime_revision` |
 
 ### 相关环境变量
 

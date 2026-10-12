@@ -100,6 +100,39 @@ def register_slime_sglang_router(
     )
 
 
+def register_vllm_hust(
+    router_addr: str,
+    *,
+    engine_id: str = "vllm-hust",
+    model_id: str,
+    runtime_revision: str,
+    accelerator_backend: str = "vllm-ascend-hust",
+    framework: str = "gennova",
+    labels: dict[str, str] | None = None,
+    auto_scrape: bool = True,
+) -> EngineRegistration:
+    """Register a vllm-hust endpoint with immutable provenance labels."""
+
+    merged_labels = dict(labels or {})
+    merged_labels.update(
+        {
+            "integration": "gennova",
+            "model_id": model_id,
+            "runtime_revision": runtime_revision,
+            "accelerator_backend": accelerator_backend,
+        }
+    )
+    return register_engine(
+        router_addr=router_addr,
+        engine_id=engine_id,
+        engine_type="vllm-hust",
+        metrics_path="/metrics",
+        framework=framework,
+        labels=merged_labels,
+        auto_scrape=auto_scrape,
+    )
+
+
 def unregister_engine(engine_id: str) -> bool:
     with _lock:
         return _engines.pop(engine_id, None) is not None
