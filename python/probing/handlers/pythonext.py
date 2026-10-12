@@ -669,16 +669,18 @@ def register_inference_engine(
     model_id: Optional[str] = None,
     runtime_revision: Optional[str] = None,
     accelerator_backend: str = "vllm-ascend-hust",
+    accelerator_backend_revision: Optional[str] = None,
 ) -> str:
     """Register an inference engine metrics endpoint."""
     from probing.ext.engines import register_engine, register_vllm_hust, scrape_engine
 
     if engine_type == "vllm-hust":
-        if not model_id or not runtime_revision:
+        if not model_id or not runtime_revision or not accelerator_backend_revision:
             return json.dumps(
                 {
                     "error": (
-                        "vllm-hust registration requires model_id and runtime_revision"
+                        "vllm-hust registration requires model_id, runtime_revision, "
+                        "and accelerator_backend_revision"
                     )
                 }
             )
@@ -688,6 +690,7 @@ def register_inference_engine(
             model_id=model_id,
             runtime_revision=runtime_revision,
             accelerator_backend=accelerator_backend,
+            accelerator_backend_revision=accelerator_backend_revision,
             framework=framework,
         )
     else:

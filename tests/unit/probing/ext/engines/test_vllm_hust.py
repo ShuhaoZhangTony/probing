@@ -108,7 +108,8 @@ def test_register_vllm_hust_preserves_required_provenance_labels():
             "127.0.0.1:8000",
             engine_id=engine_id,
             model_id="Qwen/Qwen3.5-35B-A3B",
-            runtime_revision="d0f22d2",
+            runtime_revision="ced6857",
+            accelerator_backend_revision="5422a07",
             labels={"model_id": "must-not-override", "site": "lab"},
             auto_scrape=False,
         )
@@ -120,8 +121,9 @@ def test_register_vllm_hust_preserves_required_provenance_labels():
             "site": "lab",
             "integration": "gennova",
             "model_id": "Qwen/Qwen3.5-35B-A3B",
-            "runtime_revision": "d0f22d2",
+            "runtime_revision": "ced6857",
             "accelerator_backend": "vllm-ascend-hust",
+            "accelerator_backend_revision": "5422a07",
         }
         assert get_engine(engine_id) is registration
     finally:
@@ -137,7 +139,8 @@ def test_scraper_dispatches_vllm_hust_and_reuses_previous_window(monkeypatch):
         "127.0.0.1:8000",
         engine_id=engine_id,
         model_id="Qwen/Qwen3.5-35B-A3B",
-        runtime_revision="d0f22d2",
+        runtime_revision="ced6857",
+        accelerator_backend_revision="5422a07",
         auto_scrape=False,
     )
     calls = []
@@ -171,7 +174,10 @@ def test_http_registration_requires_vllm_hust_provenance():
         register_inference_engine("127.0.0.1:8000", engine_type="vllm-hust")
     )
     assert payload == {
-        "error": "vllm-hust registration requires model_id and runtime_revision"
+        "error": (
+            "vllm-hust registration requires model_id, runtime_revision, "
+            "and accelerator_backend_revision"
+        )
     }
 
 
@@ -198,10 +204,12 @@ def test_http_registration_routes_to_vllm_hust_adapter(monkeypatch):
             engine_id="qwen35",
             engine_type="vllm-hust",
             model_id="Qwen/Qwen3.5-35B-A3B",
-            runtime_revision="d0f22d2",
+            runtime_revision="ced6857",
+            accelerator_backend_revision="5422a07",
         )
     )
 
     assert calls[0][0] == "127.0.0.1:8000"
     assert calls[0][1]["model_id"] == "Qwen/Qwen3.5-35B-A3B"
+    assert calls[0][1]["accelerator_backend_revision"] == "5422a07"
     assert payload["engine"]["engine_type"] == "vllm-hust"

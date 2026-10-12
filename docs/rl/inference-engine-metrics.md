@@ -81,7 +81,7 @@ TTFT、TPOT 和 prefix-cache 命中率来自计数器或直方图，必须由连
 ### vllm-hust / GenNova 注册
 
 先确认 vllm-hust 的 Prometheus 端点可访问，再向 Probing 注册。模型和运行时
-修订是必填 provenance，避免 GenNova 消费来自错误模型或二进制的快照：
+修订以及加速后端修订都是必填 provenance，避免 GenNova 消费来自错误模型或二进制的快照：
 
 ```bash
 curl -G 'http://127.0.0.1:8080/apis/pythonext/engines/register' \
@@ -89,13 +89,15 @@ curl -G 'http://127.0.0.1:8080/apis/pythonext/engines/register' \
   --data-urlencode 'engine_id=qwen35-prod' \
   --data-urlencode 'engine_type=vllm-hust' \
   --data-urlencode 'model_id=Qwen/Qwen3.5-35B-A3B' \
-  --data-urlencode 'runtime_revision=d0f22d2bda562156e4dbf433ce645e1769b4f804' \
-  --data-urlencode 'accelerator_backend=vllm-ascend-hust'
+  --data-urlencode 'runtime_revision=ced6857afa0ea7b2e3f0846a62e1394e90f15607' \
+  --data-urlencode 'accelerator_backend=vllm-ascend-hust' \
+  --data-urlencode 'accelerator_backend_revision=5422a07c4dd471c2224afcfdfdca62fb4c5f75f3'
 ```
 
 也可在同一 Python 进程中调用 `register_vllm_hust(...)`。注册入口固定抓取
 `/metrics`，并保留 `model_id`、`runtime_revision`、
-`accelerator_backend` 和 `integration=gennova` 标签。
+`accelerator_backend`、`accelerator_backend_revision` 和
+`integration=gennova` 标签。
 
 ### 前置：构建 Web UI
 

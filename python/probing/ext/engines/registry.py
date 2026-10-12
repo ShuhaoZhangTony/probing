@@ -106,6 +106,7 @@ def register_vllm_hust(
     engine_id: str = "vllm-hust",
     model_id: str,
     runtime_revision: str,
+    accelerator_backend_revision: str,
     accelerator_backend: str = "vllm-ascend-hust",
     framework: str = "gennova",
     labels: dict[str, str] | None = None,
@@ -120,6 +121,7 @@ def register_vllm_hust(
             "model_id": model_id,
             "runtime_revision": runtime_revision,
             "accelerator_backend": accelerator_backend,
+            "accelerator_backend_revision": accelerator_backend_revision,
         }
     )
     return register_engine(
